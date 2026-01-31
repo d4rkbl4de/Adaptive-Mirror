@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#050505" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f5f5f5" media="(prefers-color-scheme: light)">
+    <meta name="color-scheme" content="dark light">
+    
+    <!-- SEO & Description -->
+    <meta name="description" content="An experimental behavioral analysis interface that adapts to your interaction patterns in real-time.">
+    <meta name="keywords" content="behavioral analysis, psychology experiment, interaction design, adaptive interface">
+    <meta name="author" content="Adaptive Mirror">
+    <meta name="robots" content="noindex, nofollow">
+    
+    <!-- PWA -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Adaptive Mirror">
+    <meta name="application-name" content="Adaptive Mirror">
+    <meta name="format-detection" content="telephone=no">
+    
+    <!-- Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Preload Critical Fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" as="style">
+    
+    <!-- Fonts with font-display: swap -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◉</text></svg>">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%23050505' width='100' height='100'/><text y='.85em' x='50%' text-anchor='middle' font-size='70'>◉</text></svg>">
+    <link rel="mask-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◉</text></svg>" color="#ffffff">
+    
+    <!-- Critical CSS for instant render -->
+    <style>
+        :root {
+            --bg-primary: #050505;
+            --text-primary: #ffffff;
+            --surface: rgba(255, 255, 255, 0.03);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            /* Prevent text inflation on mobile */
+            -webkit-text-size-adjust: 100%;
+            -moz-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+        
+        #ambient-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            contain: strict;
+        }
+        
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s;
+            z-index: 10;
+            /* Safe area support */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        
+        .screen.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* Loading State */
+        .boot-sequence {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 9999;
+            display: grid;
+            place-items: center;
+            transition: opacity 0.8s ease, visibility 0.8s;
+            contain: strict;
+        }
+        
+        .boot-sequence.complete {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        .boot-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #333;
+            letter-spacing: 0.2em;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        /* Prevent FOIT */
+        .fonts-loading body {
+            opacity: 0;
+        }
+        
+        .fonts-loaded body {
+            opacity: 1;
+            transition: opacity 0.3s;
+        }
+        
+        /* Noscript fallback */
+        noscript {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            color: #fff;
+            display: grid;
+            place-items: center;
+            z-index: 10000;
+            padding: 2rem;
+            text-align: center;
+        }
+    </style>
+    
+    <link rel="stylesheet" href="style.css" media="print" onload="this.media='all'; this.onload=null;">
+    <noscript><link rel="stylesheet" href="style.css"></noscript>
+</head>
+<body>
+
+    <!-- No JS Fallback -->
+    <noscript>
+        <div role="alert">
+            <h1>JavaScript Required</h1>
+            <p>This behavioral analysis interface requires JavaScript to function. Please enable JavaScript in your browser settings.</p>
+        </div>
+    </noscript>
+
+    <!-- Boot Sequence -->
+    <div class="boot-sequence" id="boot-screen" aria-hidden="true">
+        <div class="boot-text" role="status" aria-label="Loading interface">INITIALIZING INTERFACE...</div>
+    </div>
+
+    <!-- Ambient Background -->
+    <canvas id="ambient-canvas" aria-hidden="true"></canvas>
+
+    <!-- Main Application -->
+    <main id="app" role="main" aria-label="Adaptive Mirror Application">
+        
+        <!-- INTRO SCREEN -->
+        <section id="intro-screen" class="screen active" aria-label="Introduction" role="region" tabindex="-1">
+            <div class="content-wrapper centered">
+                <header class="intro-header">
+                    <div class="experimental-badge" aria-label="Experimental Version 2.1">
+                        <span class="badge-pulse"></span>
+                        <span class="badge-text">EXP-002</span>
+                    </div>
+                    
+                    <h1 class="main-title" id="site-title">
+                        Adaptive Mirror
+                        <span class="title-decoration" aria-hidden="true"></span>
+                    </h1>
+                    
+                    <p class="subtitle" id="site-subtitle">
+                        Behavioral Interface System
+                    </p>
+                </header>
+                
+                <div class="instruction-block" role="article" aria-labelledby="instruction-heading">
+                    <h2 id="instruction-heading" class="sr-only">Instructions</h2>
+                    <p class="primary-text" aria-live="polite">
+                        This system will observe how you behave for 30 seconds.
+                    </p>
+                    <p class="secondary-text">
+                        Interact naturally. Move, scroll, click, type. 
+                        <span class="highlight">Do not perform.</span>
+                    </p>
+                </div>
+
+                <div class="action-group">
+                    <button 
+                        id="begin-btn" 
+                        class="btn-primary" 
+                        aria-label="Begin 30 second behavioral observation session"
+                        type="button"
+                    >
+                        <span class="btn-text">Initialize Session</span>
+                        <span class="btn-line" aria-hidden="true"></span>
+                    </button>
+                    
+                    <p class="consent-text" aria-hidden="true">
+                        No data leaves your device. Analysis is local.
+                    </p>
+                </div>
+
+                <aside id="returning-message" class="returning-user hidden" role="status" aria-live="polite" hidden>
+                    <div class="data-indicator">
+                        <span class="indicator"></span>
+                        <span class="data-pulse"></span>
+                    </div>
+                    <p>Previous session data recovered</p>
+                </aside>
+            </div>
+        </section>
+
+        <!-- OBSERVATION SCREEN -->
+        <section 
+            id="observation-screen" 
+            class="screen" 
+            aria-label="Observation Phase" 
+            role="region"
+            aria-live="off"
+            hidden
+        >
+            <div class="content-wrapper observation-layout">
+                <div class="observation-frame" role="timer" aria-label="Observation countdown">
+                    <div class="frame-border" aria-hidden="true">
+                        <span class="corner top-left"></span>
+                        <span class="corner top-right"></span>
+                        <span class="corner bottom-left"></span>
+                        <span class="corner bottom-right"></span>
+                    </div>
+                    
+                    <div class="timer-container">
+                        <div class="timer-label">Observation Window</div>
+                        <div class="timer-display" aria-live="polite" aria-atomic="true">
+                            <span class="timer-unit" aria-hidden="true">00:</span>
+                            <span id="timer-display" class="timer-value">30</span>
+                            <span class="scan-line" aria-hidden="true"></span>
+                        </div>
+                        <div class="timer-progress" aria-hidden="true" role="progressbar" aria-valuemin="0" aria-valuemax="30" aria-valuenow="30" aria-label="Time remaining">
+                            <div class="progress-track">
+                                <div id="timer-progress" class="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-preview" aria-hidden="true">
+                        <div class="metric-dot" data-metric="movement"></div>
+                        <div class="metric-dot" data-metric="interaction"></div>
+                        <div class="metric-dot" data-metric="input"></div>
+                    </div>
+                </div>
+
+                <p class="observation-hint" aria-live="polite">Continue browsing naturally</p>
+                
+                <div class="input-channel">
+                    <label for="typing-field" class="input-label">
+                        Optional Input Channel
+                        <span class="label-hint">— type if compelled</span>
+                    </label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="typing-field" 
+                            class="text-input"
+                            placeholder="Enter text here..." 
+                            autocomplete="off" 
+                            autocorrect="off" 
+                            autocapitalize="off" 
+                            spellcheck="false"
+                            aria-label="Optional text input field"
+                            enterkeyhint="done"
+                            inputmode="text"
+                        >
+                        <span class="input-cursor" aria-hidden="true">|</span>
+                    </div>
+                </div>
+
+                <button 
+                    class="abort-btn" 
+                    id="abort-btn"
+                    aria-label="Abort observation and return to start"
+                    title="Abort (Escape)"
+                    type="button"
+                >
+                    <span class="abort-icon" aria-hidden="true">×</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- TRANSITION/PROCESSING SCREEN -->
+        <section 
+            id="transition-screen" 
+            class="screen" 
+            aria-label="Processing Phase" 
+            role="region"
+            aria-live="assertive"
+            hidden
+        >
+            <div class="content-wrapper centered">
+                <div class="processing-interface">
+                    <div class="processing-visual" aria-hidden="true">
+                        <div class="spinner-ring"></div>
+                        <div class="spinner-core"></div>
+                        <div class="data-particles"></div>
+                    </div>
+                    
+                    <div class="processing-status">
+                        <p class="analyzing-text">Synthesizing behavioral profile</p>
+                        <div class="progress-steps" aria-label="Processing steps">
+                            <span class="step" data-step="1">Pattern recognition</span>
+                            <span class="step-separator" aria-hidden="true">→</span>
+                            <span class="step" data-step="2">Vector mapping</span>
+                            <span class="step-separator" aria-hidden="true">→</span>
+                            <span class="step" data-step="3">Trait analysis</span>
+                        </div>
+                    </div>
+
+                    <div class="data-stream" aria-hidden="true">
+                        <span class="stream-item">velocity</span>
+                        <span class="stream-item">entropy</span>
+                        <span class="stream-item">rhythm</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RESULTS SCREEN -->
+        <section 
+            id="result-screen" 
+            class="screen" 
+            aria-label="Results" 
+            role="region"
+            tabindex="-1"
+            hidden
+        >
+            <div class="content-wrapper result-layout">
+                <header class="result-header">
+                    <h2 class="result-title">Behavioral Profile Generated</h2>
+                    <time id="result-timestamp" class="timestamp" datetime=""></time>
+                </header>
+
+                <div class="profile-card">
+                    <div class="trait-reveal">
+                        <span class="trait-category">Primary Classification</span>
+                        <h3 id="primary-trait" class="trait-value" aria-live="polite" aria-atomic="true">
+                            <span class="trait-skeleton">Analyzing...</span>
+                        </h3>
+                        <div class="trait-confidence" aria-hidden="true">
+                            <div class="confidence-bar"></div>
+                        </div>
+                    </div>
+
+                    <div class="metrics-dashboard" role="group" aria-label="Behavioral metrics">
+                        <div class="metric-card" data-metric="focus">
+                            <div class="metric-header">
+                                <span class="metric-label">Focus Depth</span>
+                                <span id="focus-value" class="metric-number">0</span>
+                            </div>
+                            <div class="metric-visual">
+                                <div class="metric-track">
+                                    <div 
+                                        id="focus-bar" 
+                                        class="metric-fill" 
+                                        role="progressbar" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100" 
+                                        aria-valuenow="0"
+                                        aria-label="Focus level"
+                                        style="width: 0%"
+                                    ></div>
+                                </div>
+                                <span class="metric-icon" aria-hidden="true">◉</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card" data-metric="hesitation">
+                            <div class="metric-header">
+                                <span class="metric-label">Hesitation Index</span>
+                                <span id="hesitation-value" class="metric-number">0</span>
+                            </div>
+                            <div class="metric-visual">
+                                <div class="metric-track">
+                                    <div 
+                                        id="hesitation-bar" 
+                                        class="metric-fill" 
+                                        role="progressbar" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100" 
+                                        aria-valuenow="0"
+                                        aria-label="Hesitation level"
+                                        style="width: 0%"
+                                    ></div>
+                                </div>
+                                <span class="metric-icon" aria-hidden="true">◍</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card" data-metric="control">
+                            <div class="metric-header">
+                                <span class="metric-label">Control Bias</span>
+                                <span id="control-value" class="metric-number">0%</span>
+                            </div>
+                            <div class="metric-visual">
+                                <div class="metric-track">
+                                    <div 
+                                        id="control-bar" 
+                                        class="metric-fill" 
+                                        role="progressbar" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100" 
+                                        aria-valuenow="0"
+                                        aria-label="Control bias percentage"
+                                        style="width: 0%"
+                                    ></div>
+                                </div>
+                                <span class="metric-icon" aria-hidden="true">◎</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card" data-metric="energy">
+                            <div class="metric-header">
+                                <span class="metric-label">Interaction Energy</span>
+                                <span id="energy-value" class="metric-number">0</span>
+                            </div>
+                            <div class="metric-visual">
+                                <div class="metric-track">
+                                    <div 
+                                        id="energy-bar" 
+                                        class="metric-fill" 
+                                        role="progressbar" 
+                                        aria-valuemin="0" 
+                                        aria-valuemax="100" 
+                                        aria-valuenow="0"
+                                        aria-label="Energy level"
+                                        style="width: 0%"
+                                    ></div>
+                                </div>
+                                <span class="metric-icon" aria-hidden="true">◈</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <blockquote class="interpretation-block">
+                        <p id="interpretation" class="interpretation-text">
+                            Processing behavioral vectors...
+                        </p>
+                        <footer class="interpretation-meta">
+                            <span class="meta-item">Session ID: <span id="session-id">———</span></span>
+                            <span class="meta-divider" aria-hidden="true">|</span>
+                            <span class="meta-item">Duration: 30s</span>
+                        </footer>
+                    </blockquote>
+
+                    <div class="result-actions">
+                        <button 
+                            id="restart-btn" 
+                            class="btn-secondary" 
+                            type="button"
+                        >
+                            <span class="btn-icon" aria-hidden="true">↻</span>
+                            <span class="btn-text">Initialize New Session</span>
+                        </button>
+                        
+                        <button 
+                            id="export-btn" 
+                            class="btn-ghost" 
+                            type="button"
+                            aria-label="Export results to JSON"
+                        >
+                            <span class="btn-icon" aria-hidden="true">↓</span>
+                            <span class="btn-text">Export Data</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Global Controls -->
+        <div class="global-controls" role="toolbar" aria-label="Global controls">
+            <button 
+                id="sound-toggle" 
+                class="control-btn sound-control" 
+                aria-label="Toggle audio feedback" 
+                aria-pressed="false"
+                title="Toggle sound (S)"
+                type="button"
+            >
+                <span id="sound-icon" class="control-icon" aria-hidden="true">◯</span>
+                <span class="sr-only">Sound off</span>
+            </button>
+            
+            <button 
+                id="info-toggle" 
+                class="control-btn info-control hidden" 
+                aria-label="Show information"
+                title="Information (I)"
+                type="button"
+            >
+                <span class="control-icon" aria-hidden="true">?</span>
+            </button>
+        </div>
+
+        <!-- Grid Overlay (subtle decoration) -->
+        <div class="grid-overlay" aria-hidden="true" role="presentation"></div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="main.js" type="module"></script>
+    
+    <!-- Preconnect cleanup and initialization -->
+    <script>
+        // Font loading detection
+        if ('fonts' in document) {
+            document.documentElement.classList.add('fonts-loading');
+            Promise.all([
+                document.fonts.load('1em Inter'),
+                document.fonts.load('1em "JetBrains Mono"')
+            ]).then(() => {
+                document.documentElement.classList.remove('fonts-loading');
+                document.documentElement.classList.add('fonts-loaded');
+            });
+        }
+        
+        // Remove boot screen when loaded
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const boot = document.getElementById('boot-screen');
+                if (boot) {
+                    boot.classList.add('complete');
+                    setTimeout(() => boot.remove(), 800);
+                }
+            }, 500);
+        });
+        
+        // Generate session ID only when needed (lazy)
+        const initSessionId = () => {
+            const sessionEl = document.getElementById('session-id');
+            if (sessionEl && sessionEl.textContent === '———') {
+                const array = new Uint8Array(4);
+                crypto.getRandomValues(array);
+                sessionEl.textContent = Array.from(array, b => b.toString(16).padStart(2, '0')).join('').toUpperCase().slice(0, 8);
+            }
+        };
+        
+        // Initialize when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSessionId);
+        } else {
+            initSessionId();
+        }
+        
+        // Keyboard shortcut handling
+        document.addEventListener('keydown', (e) => {
+            // Sound toggle with 'S'
+            if (e.key === 's' || e.key === 'S') {
+                document.getElementById('sound-toggle')?.click();
+            }
+        });
+    </script>
+</body>
+</html>
