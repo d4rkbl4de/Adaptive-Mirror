@@ -20,7 +20,7 @@ An experimental behavioral analysis interface that observes and adapts to user i
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/adaptive-mirror.git
+git clone https://github.com/d4rkblade/adaptive-mirror.git
 cd adaptive-mirror
 ```
 
